@@ -1,0 +1,80 @@
+---
+description: Structure and conventions for Solidity contracts (src/*.sol, excl. interfaces and mocks)
+globs: src/**/*.sol
+alwaysApply: false
+---
+
+# Solidity Contracts – Structure and Conventions
+
+## Header and pragma
+
+- First line: `// SPDX-License-Identifier: MIT`
+- Pragma: `pragma solidity 0.8.22;` (pinned version) or `^0.8.22` per project preference
+- Imports: group by source (OpenZeppelin, Uniswap, own interfaces). Order: external dependencies first, then `./interfaces/`, then other local files
+
+## Comment blocks (sections)
+
+Use the same section style across all contracts:
+
+```solidity
+/*//////////////////////////////////////////////////////////////
+                            CONSTANTS
+//////////////////////////////////////////////////////////////*/
+```
+
+Mandatory section order:
+
+1. **CONSTANTS** – constants (MAX_BPS, roles, limits)
+2. **STATE VARIABLES** – state variables
+3. **MODIFIERS** – modifiers (validation, access control)
+4. **CONSTRUCTOR** – constructor (with `/// @custom:oz-upgrades-unsafe-allow constructor` if upgradeable)
+5. **INITIALIZER** – `initialize()` if the contract is upgradeable
+6. **ADMIN / EXTERNAL FUNCTIONS** – external functions (public/admin)
+7. **INTERNAL / PRIVATE FUNCTIONS** – internal logic and `_authorizeUpgrade` if applicable
+
+## Comments and removals
+
+- When removing code, do not add comments to justify or explain the removal; the diff and history are enough
+
+## NatSpec
+
+- Contract: `@title`, `@notice`, `@dev` block below pragma/imports
+- External and public functions: `@notice` (and `@dev` when there are security constraints or invariants)
+- Parameters: `@param name description`
+- Custom errors: document in the interface; in the contract they may be briefly repeated if security-relevant
+
+## Interfaces
+
+- Every contract with an external API must have an interface in `src/interfaces/I<ContractName>.sol`
+- The interface defines: events, custom errors, and all external functions exposed by the contract
+- The contract implements the interface: `contract <ContractName> is ... I<ContractName>`
+- No logic in interfaces; only signatures, events, and errors
+
+## Custom errors
+
+- Define in the interface and use in the contract
+- Naming: `ContractName__ShortDescription()` (double underscore)
+- Include parameters when it helps debugging (e.g. `InvalidAmount(uint256 amount)`)
+
+## Function order within each section
+
+- Within ADMIN/EXTERNAL: group by domain (config, setters, actions). Keep order aligned with the interface
+- View/pure at the end of the external functions block or in a separate VIEW FUNCTIONS section
+
+## When to use separate files
+
+- **One main contract per file** (same name as the contract: `TokenFactory.sol` → `contract TokenFactory`)
+- **Libraries and DataTypes**: separate file (e.g. `DataTypes.sol`) when shared across contracts
+- **Mocks**: under `contracts/mocks/`; do not mix with production code
+
+## Upgradeability (UUPS/OZ)
+
+- Constructor must call `_disableInitializers()`
+- Do not leave initializers unprotected; use `initializer` modifier on `initialize`
+- Document in NatSpec when a setter has security constraints (ratios, limits)
+
+## Access control and roles
+
+- **Do not use `onlyRole(DEFAULT_ADMIN_ROLE)`** for function access. Use dedicated roles (e.g. `ADMIN_ROLE`, `PAUSER_ROLE`, `UPGRADER_ROLE`) so that each capability is explicit and can be granted separately.
+- Grant `DEFAULT_ADMIN_ROLE` in `initialize()` or constructor only so that the designated admin can manage role admins (grant/revoke other roles). No function modifier should depend on `DEFAULT_ADMIN_ROLE`.
+- When adding a new contract with AccessControl, define and use specific roles for each set of operations (e.g. create project → `ADMIN_ROLE`, upgrade → `UPGRADER_ROLE`, set token / modules → `ADMIN_ROLE` on ComplianceBase).

@@ -1,0 +1,13 @@
+{
+  "arbitrum_sepolia": {
+    "chainId": 421614,
+    "rpcEnv": "ARBITRUM_SEPOLIA_RPC_URL",
+    "label": "Arbitrum Sepolia"
+  },
+  "arbitrum_mainnet": {
+    "chainId": 42161,
+    "rpcEnv": "ARBITRUM_MAINNET_RPC_URL",
+    "label": "Arbitrum One"
+  }
+}
+

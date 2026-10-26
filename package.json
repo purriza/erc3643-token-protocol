@@ -1,0 +1,22 @@
+{
+  "name": "erc3643-token-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ERC-3643/T-REX style permissioned token stack with identity, claims and modular compliance",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "test:verbose": "forge test -vvv",
+    "coverage": "rm -rf coverage && rm -f lcov.info && forge coverage --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage",
+    "scripts:menu": "bash script/scriptMaster.sh",
+    "abis:refresh": "DEPLOYMENTS_ACTION=abis_only node script/tools/export-deployments.js"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "viem": "^2.47.1"
+  }
+}

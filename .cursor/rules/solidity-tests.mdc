@@ -1,0 +1,65 @@
+---
+description: Structure and conventions for Foundry tests (.t.sol)
+globs: test/**/*.t.sol
+alwaysApply: false
+---
+
+# Foundry Tests (.t.sol) – Structure and Conventions
+
+## File and folder structure
+
+- One test file per **behavior domain** (e.g. `Transfer.t.sol`, `CreateProject.t.sol`, `Getters.t.sol`)
+- Folder per contract/subsystem: `test/<Contract>/<Behavior>.t.sol` (e.g. `test/Token3643/Transfer.t.sol`)
+- Invariant tests in subfolder: `test/<Contract>/Invariants/<Name>Invariant.t.sol`
+- Shared setup: `test/TestSetup.t.sol`; tests inherit from it (`contract DepositTest is TestSetup`)
+- Mocks in `test/mocks/` (and `test/mocks/interfaces/` if needed)
+
+## When to create a new file
+
+- **One file per flow or function group**: Init, Getters, CreateProject, Transfer, ForcedTransfer, Modules, Upgrade, etc.
+- **Invariants**: separate file(s) under `Invariants/`, with handlers if applicable
+- **Cross-contract or E2E scenarios**: one file per scenario if it is large (e.g. `ScenarioFlow.t.sol`)
+- Do not mix many unrelated domains in a single file
+
+## Order within the test file
+
+1. **Header**: SPDX, pragma, imports (forge-std, TestSetup, contract under test, interfaces, mocks)
+2. **Test contract**: name `{Behavior}Test` (e.g. `DepositTest`)
+3. **Sections with comments** (same style as contracts):
+
+   - **ERRORS** – custom errors used in expectRevert (if redefined or referenced)
+   - **STATE VARS** – test state variables (e.g. `minDepositAmount`)
+   - **setUp()** – override `TestSetup.setUp()`, file-specific configuration
+   - **STATE CHANGE TESTS** – tests that assert effects (state, balances, events)
+   - **NEGATIVE TESTS** – tests that expect revert (invalid input, paused, insufficient allowance, etc.)
+   - Optional: **EDGE CASES**, **EVENTS**, **GAS** if there are many and you want to group them
+
+4. Within each section: logical order (by flow or by function under test)
+
+## Test names
+
+- Format: `test_<FunctionOrAction>_<ShortDescription>()`
+- Examples: `test_Transfer_FromTreasuryToUser_WhenActive()`, `test_CreateProject_EmitsProjectCreated()`, `test_SetIdentity_RevertsWhenNotComplianceAdmin()`
+- Be descriptive: the name should convey the scenario without reading the body
+
+## Content of each test
+
+- One test = one behavior or one specific revert
+- Use `vm.startPrank(user)` / `vm.stopPrank()` to change `msg.sender`
+- For reverts: `vm.expectRevert(...)` with selector and parameters when applicable
+- For events: `vm.expectEmit(...)` then the call that emits
+- Assertions: `assertEq`, `assertTrue`, `assertGt`, etc., with message as last parameter when helpful
+
+## Invariant tests
+
+- Inherit from `StdInvariant` and `TestSetup`
+- `setUp`: instantiate handler, `targetContract(address(handler))`
+- Names: `invariant_<DescriptiveName>()` (e.g. `invariant_TotalCollateralEqualsSumOfPositions()`)
+- Document in `@dev` what invariant is being checked
+- Keep invariants in dedicated files under `Invariants/`
+
+## Imports and TestSetup
+
+- Always import the contract under test and its interface (for events/errors)
+- Reuse users, constants, and deployed contracts from `TestSetup` (admin, user1, tokenFactory, projectToken, etc.)
+- Do not duplicate full deployment; extend `setUp()` only for what is specific to the file

@@ -1,0 +1,56 @@
+---
+description: Structure and conventions for Foundry scripts (.s.sol)
+globs: script/**/*.s.sol
+alwaysApply: false
+---
+
+# Foundry Scripts (.s.sol) – Structure and Conventions
+
+## Location and naming
+
+- **Deploy**: `script/deploy/` (e.g. `Deploy.s.sol`, `Upgrade.s.sol`, `DeployMock.s.sol`)
+- **Post-deploy configuration**: `script/config/` (e.g. `ConfigureTokenFactory.s.sol`) if needed
+- **Verification / mainnet/fork testing**: `script/testing-verification/` for verification or fork scripts
+- Shared utilities: `script/NetworkAddresses.sol` or similar for addresses per network
+
+## Script structure
+
+1. **Header**: SPDX, pragma, imports
+   - `forge-std/Script.sol`, `forge-std/console.sol`
+   - Contracts to deploy or interact with
+   - Do not import unused symbols
+
+2. **Script contract NatSpec**
+   - `@title`, `@notice`, `@dev` describing what the script does (full deploy, upgrade, configure X, verify Y)
+
+3. **Script state**
+   - Variables for addresses (implementation, proxy, dependencies)
+   - Flags or options (e.g. which contracts to deploy) if the script is parametrizable
+   - Group by type: deployment addresses, config addresses, flags
+
+4. **`run()` function**
+   - Standard Foundry entry point
+   - Load env (e.g. `vm.envUint("DEPLOYER_PRIVATE_KEY")`) at the start
+   - Typical order: read config/network → deploy or load contracts → configure → optionally verify
+   - Use `vm.startBroadcast()` / `vm.stopBroadcast()` around txs that must be broadcast
+
+## Best practices
+
+- **No hardcoded keys**: use `vm.envUint("DEPLOYER_PRIVATE_KEY")` or similar
+- **Addresses per network**: centralize in `NetworkAddresses.sol` or env vars read in `run()`
+- **Idempotency**: if the script configures on-chain state, document whether it is safe to re-run (e.g. setters that overwrite)
+- **Console**: use `console.log` for important addresses and values in dry-run and broadcast
+- **Verification**: if the script deploys and then verifies, keep order: deploy → verify (or call a separate verify script)
+
+## When to use a separate script
+
+- **Initial deploy** vs **Upgrade** vs **Mocks only**: separate scripts
+- **Configuration**: one script per contract or domain if there are many post-deploy steps
+- **Verification**: one script per contract or logical group when verifying on Etherscan
+- **Testing/verification flows**: scripts under `testing-verification/` or thematic subfolders when needed
+
+## Interaction with .sh
+
+- `.sh` scripts typically invoke `forge script script/.../X.s.sol:ContractName --rpc-url ... --broadcast --verify`
+- The .s.sol script must not assume a specific working directory; use paths relative to the repo (imports already are)
+- Env vars (RPC, keys, network) documented in the .sh or README; the script only consumes them

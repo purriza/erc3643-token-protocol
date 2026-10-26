@@ -1,0 +1,83 @@
+---
+description: Structure and conventions for Solidity interfaces (contracts/interfaces/*.sol)
+globs: src/**/interfaces/*.sol
+alwaysApply: false
+---
+
+# Solidity Interfaces – Structure and Conventions
+
+## Location and naming
+
+- All interfaces in `contracts/interfaces/`
+- File name: `I<ContractName>.sol`
+- The interface must reflect the public API of the contract that implements it
+
+## Header and pragma
+
+- SPDX and pragma same as in contracts. Use `^0.8.22` for flexibility
+- Imports: only what is needed for types (other interfaces, IERC20, etc.). Do not import implementations
+
+## Interface content (what to include)
+
+Include **everything** that is part of the contract's public surface:
+
+- Events emitted by the contract
+- Custom errors used in reverts
+- `initialize` function (if upgradeable)
+- All external functions (external/public that are exposed)
+- Getters for state variables and constants that are read from outside
+
+Do not include:
+
+- Implementation details
+- Internal/private functions
+- State variables (only their getters)
+
+## Section order
+
+Use consistent comment blocks:
+
+```solidity
+/*//////////////////////////////////////////////////////////////
+                                STORAGE
+//////////////////////////////////////////////////////////////*/
+
+/*//////////////////////////////////////////////////////////////
+                                EVENTS
+//////////////////////////////////////////////////////////////*/
+
+/*//////////////////////////////////////////////////////////////
+                            CUSTOM ERRORS
+//////////////////////////////////////////////////////////////*/
+
+/*//////////////////////////////////////////////////////////////
+                                INITIALIZER
+//////////////////////////////////////////////////////////////*/
+
+/*//////////////////////////////////////////////////////////////
+                            ADMIN FUNCTIONS
+//////////////////////////////////////////////////////////////*/
+
+/*//////////////////////////////////////////////////////////////
+                            VIEW FUNCTIONS
+//////////////////////////////////////////////////////////////*/
+```
+
+Order: 1) STORAGE (structs, enums, and other types exposed by the interface), 2) EVENTS, 3) CUSTOM ERRORS, 4) INITIALIZER (if applicable), 5) functions by role (ADMIN, etc.), 6) VIEW FUNCTIONS last.
+
+## NatSpec in interfaces
+
+- `@title`, `@notice`, `@dev` block for the interface
+- Each function: short `@notice`; `@param` for each parameter
+- For functions with security constraints (ratios, limits, permissions): use `@dev` with explicit constraint (e.g. "Must be between 5%-100%", "SECURITY CONSTRAINT")
+
+## When to create a new interface
+
+- For each contract that exposes an external API (called by other contracts or frontends)
+- For external dependencies that are mocked in tests (those may live in `test/mocks/interfaces/` or `contracts/mocks/interfaces/` depending on usage)
+- Do not create interfaces for purely internal contracts or libraries without an external API
+
+## Consistency with the contract
+
+- Signatures (name, parameters, returns) must match the contract exactly
+- Adding or changing an external function in the contract requires updating the interface in the same change

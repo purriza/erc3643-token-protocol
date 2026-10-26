@@ -1,0 +1,59 @@
+---
+description: Structure and conventions for shell scripts (.sh)
+globs: **/*.sh
+alwaysApply: false
+---
+
+# Shell Scripts (.sh) – Structure and Conventions
+
+## Header and safe mode
+
+- Shebang: `#!/bin/bash`
+- Short comment in the first lines describing what the script does
+- `set -e` to exit on the first failing command (unless errors are handled explicitly)
+
+## Recommended structure
+
+1. **Configuration and colors/helpers** (optional)
+   - Define colors (RED, GREEN, YELLOW, BLUE, NC) and functions `print_status`, `print_success`, `print_warning`, `print_error` for consistent output
+
+2. **Pre-checks**
+   - Check for `.env` or required variables before running
+   - Load `.env` with `source .env` when the script depends on env vars
+
+3. **Functions**
+   - Group logic in functions with clear names (e.g. `run_deployment`, `confirm_action`, `show_help`)
+   - Use `local` for variables that are only used inside the function
+
+4. **Argument parsing**
+   - Support `-h|--help` and document usage in `show_help`
+   - Typical options: `--dry-run`, `--force`, network (mainnet, sepolia, local)
+   - Validate that required arguments are present before continuing
+
+5. **Main flow**
+   - Validate network, RPC_URL, and critical variables
+   - Show summary of what will be done (network, RPC)
+   - Interactive confirmation (unless `--force`) for destructive or costly actions
+   - Call `forge` or other commands (build, script, verify)
+   - Success/error messages at the end
+
+## Usage conventions
+
+- **Paths**: prefer paths relative to the repo; if using an absolute path (e.g. to call another script), document or make it configurable
+- **Output**: use log functions (print_status, etc.) instead of bare `echo` for user-facing messages
+- **Exit codes**: `exit 0` on success, `exit 1` on error; do not use arbitrary codes without documenting
+- **Help**: `show_help` must print usage, options, supported networks, and examples; on `-h|--help` exit with 0 after showing help
+
+## Foundry integration
+
+- Build: `forge build --force` when you want to recompile before running a script
+- Script: `forge script script/<path>/File.s.sol:ContractName --rpc-url "$RPC_URL" --broadcast --verify`
+- Env vars commonly read by scripts: `DEPLOYER_PRIVATE_KEY`, `MAINNET_RPC_URL`, `SEPOLIA_RPC_URL`, etc.
+- Ensure RPC_URL and DEPLOYER_PRIVATE_KEY are set for the chosen network before running
+
+## When to use a separate .sh file
+
+- **Deploy**: main deploy script (e.g. `deploy-contracts.sh`), optionally `upgrade-contracts.sh`, `deploy-mocks.sh`
+- **Configuration**: script that runs one or more config scripts (e.g. `configure-contracts.sh`)
+- **Verification**: script that runs contract verification (e.g. `verify.sh`)
+- **Utilities**: export deployments, gas snapshot, size check, etc., each in its own script
