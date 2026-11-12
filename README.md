@@ -291,9 +291,6 @@ node script/tools/export-deployments.js
 - [`test/`](test/): Test suites grouped by domain.
 - [`script/`](script/): Deployment, upgrade and operations scripts.
 - [`deployments/abis/`](deployments/abis/): Exported ABIs for off-chain consumers.
-- `docs/images/`: Coverage report screenshot.
-- [`.env.example`](.env.example): Example environment configuration.
-- [`LICENSE`](LICENSE): License and copyright notice.
 
 ## 🔒 Security
 
