@@ -1,133 +1,311 @@
-# ERC-3643 Token Protocol (Identity + Claims)
+# ERC-3643 Token Protocol
 
-Permissioned token stack based on `Token3643`, with modular compliance, on-chain
-identity anchors and claim-based transfer checks. The design follows the
-ERC-3643 / T-REX model for regulated and permissioned token issuance.
+A permissioned tokenization system inspired by the ERC-3643 and T-REX
+model. It combines token issuance with on-chain identities, trusted issuers,
+claims and modular transfer compliance.
 
-## Origin and license
+The protocol is designed to support the issuance and transfer of tokenized
+assets where participants must satisfy predefined eligibility requirements.
 
-This repository is a cleaned-up, rebranded copy of a permissioned tokenization
-protocol I designed and implemented end to end as the sole author of the
-contracts. It was deployed and verified on Arbitrum One and Arbitrum Sepolia
-under a different name. Every Solidity file carries an MIT
-`SPDX-License-Identifier` and is republished here under those terms; see
+## Origin and License
+
+This repository is a cleaned-up and rebranded copy of a permissioned
+tokenization protocol I designed and implemented end to end as the sole
+author of the contracts.
+
+The original contracts were deployed and verified on Arbitrum One and
+Arbitrum Sepolia under a different name. Every Solidity file carries an MIT
+`SPDX-License-Identifier` and is republished under those terms. See
 [LICENSE](LICENSE) for the copyright notice.
 
-Deployment addresses, broadcast artifacts, execution traces, coverage reports
-and internal tooling have been removed. What remains is the contract source,
-the full test suite, the deployment and operations scripts, and the exported
-ABIs. All addresses in `.env.example` and in the example recipient files are
-placeholders and must be populated before running anything against a live
-network.
+Selected addresses from the original Arbitrum One deployment are listed in
+the [Deployments](#-deployments) section for reference. Broadcast artifacts,
+execution traces, coverage reports and internal tooling have been removed
+from this repository.
 
-## Architecture
+The repository contains the contract source, test suite, deployment and
+operations scripts and exported ABIs. Addresses in `.env.example` and the
+example recipient files are placeholders and must be populated before
+running scripts that depend on them.
 
-Each emission deployed through `TokenFactory` includes:
+## ⚙️ How It Works
 
-- `Token3643` (non-upgradeable token)
-- `IdentityRegistry` (UUPS proxy, wallet -> identity)
-- `ComplianceBase` (UUPS proxy, module orchestrator + pause)
-- `IdentityFactory` (UUPS proxy, creates per-user `Identity`)
-- `ClaimTopicsRegistry` (UUPS proxy, required claim topics)
-- `TrustedIssuersRegistry` (UUPS proxy, trusted claim issuers)
-- `ClaimsRegistry` (UUPS proxy, identity/topic claims)
-- `ClaimComplianceModule` (module plugged into `ComplianceBase`)
-- `WalletFreezeComplianceModule` (module plugged into `ComplianceBase` for wallet/identity freeze)
-- `TopicCatalog` (global UUPS proxy shared by all emissions)
+1. **Create an emission:** A token emission is deployed through the
+   `TokenFactory`, together with the contracts required to manage its
+   identities and compliance rules.
 
-Main compliance flow:
+2. **Define eligibility requirements:** Required claim topics are configured
+   for the emission. These can represent attributes such as KYC status,
+   investor accreditation or jurisdiction.
 
-1. `ClaimTopicsRegistry` defines required topics.
+3. **Register identities:** Wallets are linked to on-chain identities through
+   the `IdentityRegistry`.
+
+4. **Issue claims:** Trusted issuers write claims for identities in the
+   `ClaimsRegistry`.
+
+5. **Check transfers:** The compliance contracts evaluate the configured
+   requirements before a token transfer can proceed.
+
+6. **Manage exceptions:** Authorized roles can perform administrative
+   actions such as freezing wallets or identities, pausing compliance
+   operations and executing forced transfers.
+
+## 🏗️ Architecture
+
+The system is built around a token factory, identity and claim registries
+and a modular compliance layer.
+
+| Component | Responsibility |
+| --- | --- |
+| **TokenFactory** | Deploys and connects the contracts required for a token emission. |
+| **Token3643** | Non-upgradeable permissioned token used for an emission. |
+| **IdentityRegistry** | Links wallets to on-chain identities. |
+| **IdentityFactory** | Creates `Identity` contracts for users. |
+| **ClaimTopicsRegistry** | Defines the claim topics required for an emission. |
+| **TrustedIssuersRegistry** | Manages trusted claim issuers. |
+| **ClaimsRegistry** | Stores claims associated with identities and topics. |
+| **ComplianceBase** | Coordinates compliance modules and enforces pause and token-caller checks. |
+| **ClaimComplianceModule** | Checks whether the required claims are present for transfers. |
+| **WalletFreezeComplianceModule** | Enforces wallet and identity freeze restrictions. |
+| **TopicCatalog** | Shared catalog of claim topics across emissions. |
+
+`IdentityRegistry`, `ComplianceBase`, `IdentityFactory`,
+`ClaimTopicsRegistry`, `TrustedIssuersRegistry`, `ClaimsRegistry` and
+`TopicCatalog` use UUPS proxies. `TopicCatalog` is shared globally across
+emissions, while the emission-specific components are deployed through the
+factory.
+
+### Transfer Compliance Flow
+
+1. `ClaimTopicsRegistry` defines the required claim topics for an emission.
 2. Wallets are linked to identities in `IdentityRegistry`.
-3. Claims are written in `ClaimsRegistry` by trusted issuers.
-4. `ClaimComplianceModule` checks required topics on transfer.
-5. `WalletFreezeComplianceModule` enforces wallet/identity freeze checks.
-6. `ComplianceBase` aggregates modules and enforces pause/token-caller guards.
+3. Trusted issuers write claims in `ClaimsRegistry`.
+4. `ClaimComplianceModule` checks required topics during transfers.
+5. `WalletFreezeComplianceModule` checks wallet and identity freeze status.
+6. `ComplianceBase` coordinates the modules and enforces pause and
+   token-caller checks.
 
-### Topic/Claim vs compliance module
+### Claims and Compliance Modules
 
-Two ways to express a transfer rule:
+The system supports two ways of expressing transfer requirements:
 
-- Model it as a **topic + claim** when the rule is a per-identity attribute attested
-  in `ClaimsRegistry` (for example KYC, accredited investor or jurisdiction).
-  The topic is registered in `TopicCatalog` and required per emission in
-  `ClaimTopicsRegistry`. Adding one is a configuration change, with no new code to deploy.
-- Model it as a **compliance module** when the rule depends on transfer context
-  or on state the contracts own. `WalletFreezeComplianceModule` is the built-in
-  case. `ComplianceBase` composes modules, so another rule is a new
-  `IComplianceModule` plugged in without touching the token.
+- **Topics and claims:** Used for identity attributes attested in
+  `ClaimsRegistry`, such as KYC status, investor accreditation or
+  jurisdiction. Topics are registered in `TopicCatalog` and required per
+  emission in `ClaimTopicsRegistry`. Adding a topic is a configuration
+  change and does not require deploying a new compliance module.
 
-## Roles (high-level)
+- **Compliance modules:** Used for rules that depend on transfer context or
+  contract-managed state. `WalletFreezeComplianceModule` is an example.
+  Additional rules can be implemented as `IComplianceModule` contracts and
+  connected to `ComplianceBase` without changing the token contract.
 
-- `UPGRADER_ROLE`: upgrades UUPS contracts.
-- `ADMIN_ROLE`: admin operations per contract.
-- `PAUSER_ROLE`: pause/unpause in `ComplianceBase`.
-- `COMPLIANCE_ADMIN_ROLE`: identity binding in `IdentityRegistry`.
-- `AGENT_ROLE`: forced transfers in `Token3643`.
+## 🚀 Features
 
-`DEFAULT_ADMIN_ROLE` is only for role administration and not used directly for business function guards.
+### Tokenization
 
-## Repository layout
+- Deploy permissioned tokens through a factory.
+- Create the contract stack required for individual token emissions.
+- Configure identity and transfer requirements for each emission.
 
-- `src/token`: token and factory contracts
-- `src/identity`: identity anchor, factory and registry
-- `src/claims`: claim-related registries
-- `src/compliance`: compliance coordinator and modules
-- `src/interfaces`: interfaces and shared errors/events
-- `test/*`: suites grouped by domain
-- `script/*`: deploy, upgrade, compliance and admin scripts
-- `deployments/abis`: exported ABIs for off-chain consumers
+### Identity and Claims
 
-## Development
+- Link wallets to on-chain identities.
+- Define required claim topics.
+- Manage trusted claim issuers.
+- Record and verify claims associated with identities.
 
-Install dependencies:
+### Compliance and Administration
+
+- Enforce transfer requirements through modular compliance contracts.
+- Freeze wallets or identities when required.
+- Support forced transfers through authorized roles.
+- Pause and unpause compliance operations.
+- Upgrade supported contracts through the UUPS proxy pattern.
+- Manage permissions through role-based access control.
+
+## 🌐 Deployments
+
+The following addresses are selected contracts from the original deployment
+on **Arbitrum One**.
+
+The original protocol was deployed under a different name. This repository
+is a cleaned-up and rebranded reference copy; its contents should not be
+assumed to match the current deployed implementations exactly.
+
+| Contract | Address | Deployment Type |
+| --- | --- | --- |
+| TopicCatalog | [0xAC20...0e04](https://arbiscan.io/address/0xAC20b602bE9C9e15b883976e7CC930031CC10e04#code) | UUPS proxy |
+| TrustedIssuersRegistry | [0xD323...D42e](https://arbiscan.io/address/0xD32317c50f1df2C3605E049379EEf8B4068cD42e#code) | UUPS proxy |
+| IdentityFactory | [0xB1a0...b5e](https://arbiscan.io/address/0xB1a0D495192c4641f69C35De13eAEd412Eeb3b5e#code) | UUPS proxy |
+| ClaimsRegistry | [0x6ADe...B047](https://arbiscan.io/address/0x6ADe4AfF0391F27B73A67b1883Cd31397E55B047#code) | UUPS proxy |
+| EmissionDeployerManager | [0x6680...d7A3](https://arbiscan.io/address/0x66803E307627f12E74FD207112B30751D5b4d7A3#code) | Contract |
+| TokenFactory | [0x1245...6C95](https://arbiscan.io/address/0x1245A83626A270EcB224eD173fe2206Ff3046C95#code) | UUPS proxy |
+
+## 🛠️ Tech Stack
+
+- **Smart contracts:** Solidity.
+- **Development and testing:** Foundry.
+- **Tokenization model:** ERC-3643 / T-REX-inspired architecture.
+- **Upgradeability:** UUPS proxies for supported contracts.
+- **Supporting tooling:** Node.js and npm.
+
+## 🔐 Roles and Permissions
+
+The protocol uses role-based access control for administrative and
+operational functions:
+
+| Role | Responsibility |
+| --- | --- |
+| `UPGRADER_ROLE` | Upgrades UUPS contracts. |
+| `ADMIN_ROLE` | Performs administrative operations on individual contracts. |
+| `PAUSER_ROLE` | Pauses and unpauses `ComplianceBase`. |
+| `COMPLIANCE_ADMIN_ROLE` | Manages identity binding in `IdentityRegistry`. |
+| `AGENT_ROLE` | Performs forced transfers in `Token3643`. |
+
+`DEFAULT_ADMIN_ROLE` is used for role administration and is not used
+directly as a guard for business functions.
+
+## 🧪 Testing
+
+The project uses Foundry for its smart contract test suite. Tests are grouped
+by domain, covering the token, identity, claims and compliance components.
+
+### Run All Tests
+
+```bash
+forge test
+```
+
+### Generate a Coverage Report
+
+```bash
+npm run coverage
+```
+
+### Coverage Results
+
+The coverage report shown below includes **228 passing tests** and **100%
+coverage** across lines, statements, branches and functions for the measured
+contracts in `src/`.
+
+![Foundry test coverage report](docs/images/coverage.png)
+
+## 🔧 Getting Started
+
+### Prerequisites
+
+- [Foundry](https://book.getfoundry.sh/getting-started/installation)
+- Git
+- Node.js and npm
+
+### Install Dependencies
 
 ```bash
 git submodule update --init
 npm install
 ```
 
-Build:
+### Build the Contracts
 
 ```bash
 forge build
 ```
 
-Run tests:
+### Run the Tests
 
 ```bash
 forge test
 ```
 
-Coverage (the suite was kept at 100% line coverage on `src/`):
+## 📦 Deployment and Operations
+
+The project includes scripts for deployment, upgrades, compliance and
+identity management.
+
+### Deploy an Emission
+
+The deployment flow described in the original repository is:
+
+1. Deploy the `TokenFactory` proxy.
+2. Call `TokenFactory.createEmission(...)` to deploy and connect the
+   emission's contracts.
+
+### Configure the Environment
+
+Copy `.env.example` to `.env` and populate the values required by the
+scripts you intend to run, including RPC URLs, the deployer key and relevant
+contract addresses.
+
+The repository's example addresses are placeholders.
+
+### Operations Menu
+
+The script `script/scriptMaster.sh` provides an interactive menu for
+deployment, upgrades, compliance and identity operations.
+
+See [`script/README.md`](script/README.md) for the environment variables
+and instructions required by each script.
+
+### Export Deployment Addresses
+
+Off-chain consumers can read deployment addresses from
+`deployments/addresses/<network>.json`.
+
+That directory is empty in this public copy. The deployment files can be
+generated from Foundry broadcast output using:
 
 ```bash
-npm run coverage
+node script/tools/export-deployments.js
 ```
 
-## Deployment
+## 📁 Repository Structure
 
-Recommended production flow:
+```text
+erc3643-token-protocol/
+├── src/
+│   ├── token/              # Token and factory contracts
+│   ├── identity/           # Identity, factory and registry contracts
+│   ├── claims/             # Claim-related registries
+│   ├── compliance/         # Compliance coordinator and modules
+│   └── interfaces/         # Interfaces and shared errors/events
+├── test/                   # Test suites grouped by domain
+├── script/                 # Deployment, upgrade and operations scripts
+├── deployments/
+│   └── abis/               # Exported ABIs for off-chain consumers
+├── docs/
+│   └── images/
+│       └── coverage.png    # Coverage report screenshot
+├── .env.example            # Example environment configuration
+├── LICENSE
+└── README.md
+```
 
-1. Deploy `TokenFactory` proxy.
-2. Call `TokenFactory.createEmission(...)` to deploy and wire the full stack.
+## 🔒 Security
 
-Copy `.env.example` to `.env` and fill in RPC URLs, the deployer key and the
-proxy addresses before running any script. `script/scriptMaster.sh` provides an
-interactive menu over the deploy, upgrade, compliance and identity scripts; see
-`script/README.md` for the environment variables each one needs.
+The architecture includes role-based permissions, transfer checks,
+wallet and identity freezing, pausable compliance operations and
+upgradeability controls.
 
-Off-chain consumers read addresses from `deployments/addresses/<network>.json`.
-That directory ships empty here because the original deployment addresses were
-removed; it is regenerated from Foundry broadcast output via
-`node script/tools/export-deployments.js`.
+The original contracts were reviewed internally before their deployment
+under a different name. This repository is published as a reference and
+portfolio project; it is not presented as deployment-ready software.
 
-## Disclaimers
+Any new deployment should be independently reviewed, tested and audited.
 
-- **Audit**: these contracts were reviewed internally and deployed to production
-  under their original name. This repository is published as a reference and
-  portfolio artifact, not as deployment-ready code; any redeployment should be
-  independently reviewed and audited.
-- **Testing**: thoroughly test on a testnet before any production use.
-- **Risk**: permissioned token systems carry both smart contract and regulatory
-  risk; the compliance logic here is a mechanism, not legal advice.
+## 📚 Resources
+
+- [ERC-3643 Specification](https://eips.ethereum.org/EIPS/eip-3643)
+- [Foundry Book](https://book.getfoundry.sh/)
+- [Solidity Documentation](https://docs.soliditylang.org/)
+
+## ⚠️ Disclaimer
+
+Permissioned token systems involve smart contract, operational and regulatory
+risks. The compliance mechanisms in this repository are technical controls
+and do not constitute legal or regulatory advice.
+
+This repository is provided for reference and portfolio purposes. Any new
+deployment should be assessed against its specific technical and legal
+requirements.
