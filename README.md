@@ -20,13 +20,13 @@ Arbitrum Sepolia under a different name. Every Solidity file carries an MIT
 
 Selected addresses from the original Arbitrum One deployment are listed in
 the [Deployments](#-deployments) section for reference. Broadcast artifacts,
-execution traces, coverage reports and internal tooling have been removed
-from this repository.
+execution traces, generated coverage reports and internal tooling have been
+removed from this repository.
 
 The repository contains the contract source, test suite, deployment and
-operations scripts and exported ABIs. Addresses in `.env.example` and the
-example recipient files are placeholders and must be populated before
-running scripts that depend on them.
+operations scripts, exported ABIs and a coverage screenshot. Addresses in
+`.env.example` and the example recipient files are placeholders and must be
+populated before running scripts that depend on them.
 
 ## ⚙️ How It Works
 
@@ -58,17 +58,18 @@ and a modular compliance layer.
 
 | Component | Responsibility |
 | --- | --- |
-| **TokenFactory** | Deploys and connects the contracts required for a token emission. |
-| **Token3643** | Non-upgradeable permissioned token used for an emission. |
-| **IdentityRegistry** | Links wallets to on-chain identities. |
-| **IdentityFactory** | Creates `Identity` contracts for users. |
-| **ClaimTopicsRegistry** | Defines the claim topics required for an emission. |
-| **TrustedIssuersRegistry** | Manages trusted claim issuers. |
-| **ClaimsRegistry** | Stores claims associated with identities and topics. |
-| **ComplianceBase** | Coordinates compliance modules and enforces pause and token-caller checks. |
-| **ClaimComplianceModule** | Checks whether the required claims are present for transfers. |
-| **WalletFreezeComplianceModule** | Enforces wallet and identity freeze restrictions. |
-| **TopicCatalog** | Shared catalog of claim topics across emissions. |
+| [TokenFactory](src/token/TokenFactory.sol) | Deploys and connects the contracts required for a token emission. |
+| [Token3643](src/token/Token3643.sol) | Non-upgradeable permissioned token used for an emission. |
+| [EmissionDeployerManager](src/token/EmissionDeployerManager.sol) | Supports the deployment of token emissions. |
+| [IdentityRegistry](src/identity/IdentityRegistry.sol) | Links wallets to on-chain identities. |
+| [IdentityFactory](src/identity/IdentityFactory.sol) | Creates `Identity` contracts for users. |
+| [ClaimTopicsRegistry](src/claims/ClaimTopicsRegistry.sol) | Defines the claim topics required for an emission. |
+| [TrustedIssuersRegistry](src/claims/TrustedIssuersRegistry.sol) | Manages trusted claim issuers. |
+| [ClaimsRegistry](src/claims/ClaimsRegistry.sol) | Stores claims associated with identities and topics. |
+| [ComplianceBase](src/compliance/ComplianceBase.sol) | Coordinates compliance modules and enforces pause and token-caller checks. |
+| [ClaimComplianceModule](src/compliance/ClaimComplianceModule.sol) | Checks whether the required claims are present for transfers. |
+| [WalletFreezeComplianceModule](src/compliance/WalletFreezeComplianceModule.sol) | Enforces wallet and identity freeze restrictions. |
+| [TopicCatalog](src/claims/TopicCatalog.sol) | Shared catalog of claim topics across emissions. |
 
 `IdentityRegistry`, `ComplianceBase`, `IdentityFactory`,
 `ClaimTopicsRegistry`, `TrustedIssuersRegistry`, `ClaimsRegistry` and
@@ -98,7 +99,8 @@ The system supports two ways of expressing transfer requirements:
 
 - **Compliance modules:** Used for rules that depend on transfer context or
   contract-managed state. `WalletFreezeComplianceModule` is an example.
-  Additional rules can be implemented as `IComplianceModule` contracts and
+  Additional rules can be implemented as
+  [`IComplianceModule`](src/interfaces/IComplianceModule.sol) contracts and
   connected to `ComplianceBase` without changing the token contract.
 
 ## 🚀 Features
@@ -172,6 +174,25 @@ directly as a guard for business functions.
 The project uses Foundry for its smart contract test suite. Tests are grouped
 by domain, covering the token, identity, claims and compliance components.
 
+Explore the [full test suite](test/) or browse the
+[smart contract source](src/).
+
+### Tests by Component
+
+- **Tokenization:** [TokenFactory](test/token/TokenFactory/),
+  [Token3643](test/token/Token3643/) and
+  [EmissionDeployerManager](test/token/EmissionDeployerManager/).
+- **Identity:** [Identity](test/identity/Identity/),
+  [IdentityFactory](test/identity/IdentityFactory/) and
+  [IdentityRegistry](test/identity/IdentityRegistry/).
+- **Claims:** [ClaimTopicsRegistry](test/claims/ClaimTopicsRegistry/),
+  [ClaimsRegistry](test/claims/ClaimsRegistry/),
+  [TopicCatalog](test/claims/TopicCatalog/) and
+  [TrustedIssuersRegistry](test/claims/TrustedIssuersRegistry/).
+- **Compliance:** [ComplianceBase](test/compliance/ComplianceBase/),
+  [ClaimComplianceModule](test/compliance/ClaimComplianceModule/) and
+  [WalletFreezeComplianceModule](test/compliance/WalletFreezeComplianceModule/).
+
 ### Run All Tests
 
 ```bash
@@ -221,8 +242,8 @@ forge test
 
 ## 📦 Deployment and Operations
 
-The project includes scripts for deployment, upgrades, compliance and
-identity management.
+The project includes [scripts](script/) for deployment, upgrades, compliance
+and identity management.
 
 ### Deploy an Emission
 
@@ -234,16 +255,16 @@ The deployment flow described in the original repository is:
 
 ### Configure the Environment
 
-Copy `.env.example` to `.env` and populate the values required by the
-scripts you intend to run, including RPC URLs, the deployer key and relevant
-contract addresses.
+Copy [`.env.example`](.env.example) to `.env` and populate the values
+required by the scripts you intend to run, including RPC URLs, the deployer
+key and relevant contract addresses.
 
 The repository's example addresses are placeholders.
 
 ### Operations Menu
 
-The script `script/scriptMaster.sh` provides an interactive menu for
-deployment, upgrades, compliance and identity operations.
+The script [`script/scriptMaster.sh`](script/scriptMaster.sh) provides an
+interactive menu for deployment, upgrades, compliance and identity operations.
 
 See [`script/README.md`](script/README.md) for the environment variables
 and instructions required by each script.
@@ -262,25 +283,17 @@ node script/tools/export-deployments.js
 
 ## 📁 Repository Structure
 
-```text
-erc3643-token-protocol/
-├── src/
-│   ├── token/              # Token and factory contracts
-│   ├── identity/           # Identity, factory and registry contracts
-│   ├── claims/             # Claim-related registries
-│   ├── compliance/         # Compliance coordinator and modules
-│   └── interfaces/         # Interfaces and shared errors/events
-├── test/                   # Test suites grouped by domain
-├── script/                 # Deployment, upgrade and operations scripts
-├── deployments/
-│   └── abis/               # Exported ABIs for off-chain consumers
-├── docs/
-│   └── images/
-│       └── coverage.png    # Coverage report screenshot
-├── .env.example            # Example environment configuration
-├── LICENSE
-└── README.md
-```
+- [`src/token/`](src/token/): Token and factory contracts.
+- [`src/identity/`](src/identity/): Identity, factory and registry contracts.
+- [`src/claims/`](src/claims/): Claim-related registries.
+- [`src/compliance/`](src/compliance/): Compliance coordinator and modules.
+- [`src/interfaces/`](src/interfaces/): Interfaces and shared errors/events.
+- [`test/`](test/): Test suites grouped by domain.
+- [`script/`](script/): Deployment, upgrade and operations scripts.
+- [`deployments/abis/`](deployments/abis/): Exported ABIs for off-chain consumers.
+- `docs/images/`: Coverage report screenshot.
+- [`.env.example`](.env.example): Example environment configuration.
+- [`LICENSE`](LICENSE): License and copyright notice.
 
 ## 🔒 Security
 
