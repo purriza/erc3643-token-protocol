@@ -10,8 +10,10 @@ deployments/addresses/*.json
 # Execution traces
 trace_*.json
 
-# Docs
-docs/
+# Docs. Images are published with the README.
+docs/*
+!docs/images/
+!docs/images/**
 
 # Dotenv file
 .env
